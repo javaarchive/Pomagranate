@@ -25,7 +25,9 @@
     "socket.io-client": "^2.3.0",
     "express-fileupload": "^1.1.6",
     "connect-busboy": "^0.0.2",
-    "shortid": "^2.2.15"
+    "shortid": "^2.2.15",
+    "sqlite3": "^4.2.0",
+    "sql": "^0.78.0"
   },
   "engines": {
     "node": "12.x"

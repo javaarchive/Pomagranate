@@ -44,8 +44,7 @@ app.use(
     tempFileDir: config.uploadDir,
     safeFileNames: true,
     abortOnLimit: true,
-    createParentPath: true,
-    debug: true
+    createParentPath: true
   })
 );
 // https://expressjs.com/en/starter/basic-routing.html
@@ -79,9 +78,86 @@ socket.on("disconnect", function() {
   console.warn("Lost connection to Vine Serve...reconnecting");
   socket = require("socket.io-client")("http://pomagranate-vine.glitch.me");
 });
-const shortid = require('shortid');
- 
+const shortid = require("shortid");
+var videodb = config.videodb;
 console.log(shortid.generate());
+app.get("/watch", async function(req, res) {
+  if (!req.query.v) {
+    res.send("Specifu a video.");
+    return;
+  }
+  if (await videodb.has(req.query.v)) {
+    //res.send("Complete");
+    res.render(__dirname + "/views/video.html", {
+      ...config.webexports,
+      ...{ id: req.query.v }
+    });
+  } else {
+    res.send(
+      "I couldn't find " +
+        req.query.v +
+        " in the database. Videos like " +
+        JSON.stringify(await videodb.all())
+    );
+    return;
+  }
+});
+app.get("/raw/:id", async function(req, res) {
+  let id = req.params.id;
+  console.log("ID: " + id);
+  if (await videodb.has(id)) {
+    //res.send("Complete");
+    console.log("Retrieving");
+    let counter = 0;
+    let video = await videodb.get(id);
+    let hashList = video["hashList"];
+    let reverseLookup = {};
+    for (var i = 0; i < hashList.length; i++) {
+      reverseLookup[hashList[i]] = i;
+      socket.emit("askforchunk", { chunkhash: hashList[i] });
+    }
+    let waittoendrequest = setInterval(function() {
+      if (counter == hashList.length) {
+        socket.off("hashretrieved");
+        res.end(null, "binary");
+        console.log("Finished");
+        clearInterval(waittoendrequest);
+      }
+    }, 500);
+    setTimeout(function() {
+      counter = hashList.length;
+      // Auto stop
+    }, 10000);
+    socket.on("hashretrieved", function(data) {
+      let thisinterval = setInterval(function() {
+        if (counter == reverseLookup[data.hash]) {
+          console.log("Sending " + counter);
+          res.write(data.rawdata, null);
+          clearInterval(thisinterval);
+          counter++;
+        }
+      }, 500);
+    });
+  } else {
+    res.redirect(
+      301,
+      "https://github.com/esc0rtd3w/blank-intro-videos/raw/master/blank.mp4"
+    );
+    // Show blank
+    return;
+  }
+});
+
+socket.on("requestchunk", function(data) {
+  console.log("Checking for chunk " + data.hash);
+  if (fs.existsSync(config.distDir + data.hash + ".buf")) {
+    fs.readFile(config.distDir + data.hash + ".buf", function(err, rawdata) {
+      console.log("I've got an " + data.hash);
+      socket.emit("gotchunk", { hash: data.hash, rawdata: rawdata });
+    });
+    //socket.emit("gotchunk", { hash: data.hash });
+  }
+});
 app.post("/upload", (req, res) => {
   // Upload and process file
   console.log("File Uploaded");
@@ -94,36 +170,53 @@ app.post("/upload", (req, res) => {
 
   fs.open(filePath, "r", function(err, fd) {
     if (err) throw err;
+    let hashes = [];
     function readNextChunk() {
-      fs.read(fd, buffer, 0, config.bufferSize, null, function(err, nread) {
+      fs.read(fd, buffer, 0, config.bufferSize, null, async function(
+        err,
+        nread
+      ) {
         if (err) throw err;
 
         if (nread === 0) {
           // done reading file, do any necessary finalization steps
-
+          let id = shortid.generate();
+          await videodb.set(id, { hashList: hashes });
+          res.render(__dirname + "/views/finish.html", {
+            ...config.webexports,
+            ...{ output_link: "/watch?v=" + id }
+          });
           fs.close(fd, function(err) {
             if (err) throw err;
           });
+
           return;
         }
 
-        var data;
+        let data;
         if (nread < config.bufferSize) data = buffer.slice(0, nread);
         else data = buffer;
+        /*
+         let h2 = crypto.createHash("sha1");
+        h2.update(data);
+        console.log("Verifacation: "+h2.digest("hex"));
+        */
+        console.log("A chunk! ");
+        //console.log(data);
+        console.log(data.length);
         let h = crypto.createHash("sha1");
         h.update(data);
-        var hash = h.digest("hex");
-        console.log("A chunk! ");
+        let hash = h.digest("hex");
         socket.emit("distchunk", { hash: hash, rawdata: data });
-        console.log("Sent chunk to vine!");
+        console.log(data);
+        console.log("Sent chunk to vine with hash " + hash);
+        hashes.push(hash);
         readNextChunk();
         // do something with `data`, then call `readNextChunk();`
       });
     }
     readNextChunk();
   });
-
-  res.render(__dirname + "/views/finish.html", config.webexports);
 });
 // listen for requests :)
 const listener = http.listen(process.env.PORT, () => {
