@@ -1,0 +1,22 @@
+<div class="text-lg ml-6 bold px-8 py-3">
+  Upload a video
+</div>
+<div class="text-sm ml-6 bold px-8 p-2">
+  Upload a video onto the peer to peer of Pomagranate. You are limited to 1 file
+  per 30 minutes to prevent abuse and the max file size is 25mb.
+</div>
+<div class="text-sm ml-6 bold px-8 p-2">
+  <form method="POST" enctype="multipart/form-data">
+    <input
+      type="file"
+      name="targetfile"
+      accept="video/mpeg4,video/mpeg,video/x-msvideo,video/x-ms-wmv,.mov,.mp4,.webm"
+    />
+    <button
+      type="submit"
+      class="text-semibold bg-pink-500 p-2 rounded text-white"
+    >
+      Upload
+    </button>
+  </form>
+</div>

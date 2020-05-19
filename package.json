@@ -2,7 +2,7 @@
   "//1": "describes your app and its dependencies",
   "//2": "https://docs.npmjs.com/files/package.json",
   "//3": "updating this file will download and update your packages",
-  "name": "hello-empowered-express",
+  "name": "pomagranate",
   "version": "0.0.1",
   "description": "A simple Node app built on Express, instantly up and running.",
   "main": "server.js",
@@ -22,7 +22,10 @@
     "tailwindcss": "^1.4.3",
     "postcss": "^7.0.30",
     "postcss-cli": "^7.1.1",
-    "socket.io-client": "^2.3.0"
+    "socket.io-client": "^2.3.0",
+    "express-fileupload": "^1.1.6",
+    "connect-busboy": "^0.0.2",
+    "shortid": "^2.2.15"
   },
   "engines": {
     "node": "12.x"
