@@ -10,6 +10,8 @@ const config = require("./config");
 const fileUpload = require("express-fileupload");
 var busboy = require("connect-busboy");
 var bodyParser = require("body-parser");
+var WebTorrent = require("webtorrent");
+var client = new WebTorrent();
 app.engine(".html", exphbs({ extname: ".html" }));
 app.set("view engine", ".html");
 var connected = [];
@@ -33,7 +35,6 @@ io.use(ios(sess));
 // https://expressjs.com/en/starter/static-files.html
 app.use(express.static("public"));
 
-
 // default options, no immediate parsing
 app.use(busboy());
 app.use(
@@ -55,7 +56,7 @@ app.get("/upload", (req, res) => {
 });
 var socket = require("socket.io-client")("http://pomagranate-vine.glitch.me");
 // Client Distribution Setup
-io.on("connection", function(clientsocket) {
+io.on("connection", async function(clientsocket) {
   connected.push(clientsocket);
   clientsocket.on("gotchunk", function(data) {
     let buffer = Buffer.from(data.stringdata, "base64");
@@ -75,6 +76,10 @@ io.on("connection", function(clientsocket) {
     connected = connected.filter(x => x != clientsocket); // Remove from connected;
   });
 });
+// Error Handler
+function handleErrors(err){
+  console.log(err);
+}
 // End Client Distribution
 var crypto = require("crypto");
 
@@ -100,11 +105,23 @@ socket.on("distribution", function(data) {
     }
     let peopleToPick = Math.ceil(config.jucingtototal * connected.length);
     console.log("Distributing " + data.hash + " " + peopleToPick + " times");
+    let stringdata = data.rawdata.toString("base64");
     for (let i = 0; i < peopleToPick; i++) {
       connected[Math.floor(Math.random() * connected.length)].emit(
         "distribution",
-        { hash: data.hash, stringdata: data.rawdata.toString("base64") }
+        { hash: data.hash, stringdata: stringdata }
       );
+    }
+    if (config.useWebtorrent) {
+      console.log("Sent to webtorrent client");
+      data.name = "Pomagranate Chunk";
+      client.seed(data.rawdata, async function(torrent) {
+        console.log(
+          "Webtorrent Client is seeding:",
+          torrent.magnetURI + " also known as chunk " + data.hash
+        );
+        await config.webtorrentMagnetToHash.set(data.hash, torrent.magnetURI);
+      });
     }
   });
 });
@@ -181,9 +198,23 @@ app.get("/raw/:id", async function(req, res) {
     return;
   }
 });
-
-socket.on("requestchunk", function(data) {
+client.on("error",handleErrors);
+socket.on("requestchunk", async function(data) {
   console.log("Checking for chunk " + data.hash);
+  if (config.useWebtorrent) {
+    let indatabase = await config.webtorrentMagnetToHash.has(data.hash);
+    console.log("Using webtorrent to try to download")
+    if (indatabase) {
+      let magnet = await config.webtorrentMagnetToHash.get(data.hash);
+      console.log(
+        "Fetching " + data.hash + " through torrent using magnet " + magnet
+      );
+      client.add(magnet, function(torrent) {
+        console.log("WebTorrent download for"+data.hash+" completed")
+        console.log(torrent.files);
+      });
+    }
+  }
   io.sockets.emit("requestchunk", { chunkhash: data.hash });
   if (fs.existsSync(config.distDir + data.hash + ".buf")) {
     fs.readFile(config.distDir + data.hash + ".buf", function(err, rawdata) {
@@ -207,7 +238,8 @@ app.post("/upload", (req, res) => {
     highWaterMark: config.bufferSize,
     encoding: "binary"
   });
-
+  let torrentsList = [];
+  let counter = 0;
   readStream
     .on("data", function(chunk) {
       let data = Buffer.from(chunk, "binary");
@@ -217,23 +249,42 @@ app.post("/upload", (req, res) => {
       h.update(data);
       console.log("hashed");
       let hash = h.digest("hex");
-      console.log(data);
+      //console.log(data);
       let prep = { hash: hash, rawdata: data };
       socket.emit("distchunk", prep);
-      console.log(data);
+      //console.log(data);
       console.log("Sent chunk to vine with hash " + hash);
       hashes.push(hash);
       console.log("chunk Data : ");
-      //console.log(chunk); // your processing chunk logic will go here
+      let currentChunk = counter;
+      data.name = "Pomagranate Chunk";
+      counter++;
+      if (config.useWebtorrent) {
+        client.seed(data, function(torrent) {
+          console.log(
+            "Client is seeding uploaded chunk:" +
+              torrent.magnetURI +
+              " also known as " +
+              hash
+          );
+          utils.setResizeArr(currentChunk, torrent.magnetURI, torrentsList);
+        });
+      }
     })
     .on("end", async function() {
       console.log("################### finished");
-      let id = shortid.generate();
-      await videodb.set(id, { hashList: hashes });
-      res.render(__dirname + "/views/finish.html", {
-        ...config.webexports,
-        ...{ output_link: "/watch?v=" + id }
-      });
+      setTimeout(async function() {
+        let id = shortid.generate();
+        let metadata = { hashList: hashes };
+        if (config.useWebtorrent) {
+          metadata["torrentList"] = torrentsList;
+        }
+        await videodb.set(id, metadata);
+        res.render(__dirname + "/views/finish.html", {
+          ...config.webexports,
+          ...{ output_link: "/watch?v=" + id }
+        });
+      }, config.waitComplete);
       //console.log(data);
       // here you see all data processed at end of file
     });

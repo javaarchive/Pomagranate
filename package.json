@@ -3,7 +3,7 @@
   "//2": "https://docs.npmjs.com/files/package.json",
   "//3": "updating this file will download and update your packages",
   "name": "pomagranate",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "description": "A simple Node app built on Express, instantly up and running.",
   "main": "server.js",
   "scripts": {
@@ -27,7 +27,9 @@
     "connect-busboy": "^0.0.2",
     "shortid": "^2.2.15",
     "sqlite3": "^4.2.0",
-    "sql": "^0.78.0"
+    "sql": "^0.78.0",
+    "webtorrent": "0.107.16",
+    "end-of-stream": "1.4.1"
   },
   "engines": {
     "node": "12.x"

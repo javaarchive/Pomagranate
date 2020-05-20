@@ -4,4 +4,13 @@ function countDir(directory, cb) {
     cb(files.length);
   });
 }
-module.exports = { countDir: countDir };
+function setResizeArr(pos,item, arr){
+  if(pos >= arr.length){
+    for(let i =0 ;i < (pos-arr.length);  i++){
+      arr.push(undefined);
+    }
+  }
+  arr[pos] = item;
+  return arr;
+}
+module.exports = { countDir: countDir ,setResizeArr:setResizeArr};
