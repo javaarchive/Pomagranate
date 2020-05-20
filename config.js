@@ -9,6 +9,7 @@ module.exports = {
   "uploadDir":"/tmp/", // Make sure you have a trailing /
   "distDir": __dirname+"/.data/",
   "videodb": new Endb('sqlite://videodb.sqlite'),
-  "maxFiles": 15, // Maximum amount of files before we stop saving to server
-  "jucingtototal":1/3 // Basically saying 1/3 of the total users juice each video
+  "maxFiles": 25, // Maximum amount of files before we stop saving to server
+  "jucingtototal":1/2 // Basically saying 1/3 of the total users juice each video
+
 }

@@ -1,7 +1,4 @@
-// server.js
-// where your node app starts
-// we've started you off with Express (https://expressjs.com/)
-// but feel free to use whatever libraries or frameworks you'd like through `package.json`.
+// Pomagranate Imports
 const express = require("express");
 const app = express();
 const path = require("path");
@@ -10,6 +7,9 @@ const fs = require("fs");
 var session = require("express-session");
 const exphbs = require("express-handlebars");
 const config = require("./config");
+const fileUpload = require("express-fileupload");
+var busboy = require("connect-busboy");
+var bodyParser = require("body-parser");
 app.engine(".html", exphbs({ extname: ".html" }));
 app.set("view engine", ".html");
 var connected = [];
@@ -22,11 +22,9 @@ let sess = session({
   saveUninitialized: false
 });
 app.use(sess);
-var bodyParser = require("body-parser");
 app.use(bodyParser.json()); // support json encoded bodies
 app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 var http = require("http").createServer(app);
-//var server = http.Server(app);
 var io = require("socket.io")(http);
 // Setup sessions for socketio
 var ios = require("socket.io-express-session");
@@ -34,14 +32,13 @@ io.use(ios(sess));
 // make all the files in 'public' available
 // https://expressjs.com/en/starter/static-files.html
 app.use(express.static("public"));
-var busboy = require("connect-busboy");
+
 
 // default options, no immediate parsing
 app.use(busboy());
-const fileUpload = require("express-fileupload");
 app.use(
   fileUpload({
-    limits: { fileSize: 50 * 1024 * 1024 },
+    limits: { fileSize: 150 * 1024 * 1024 },
     useTempFiles: true,
     tempFileDir: config.uploadDir,
     safeFileNames: true,
